@@ -1,0 +1,106 @@
+---
+- hosts: webserver
+  become: yes
+  gather_facts: no
+  vars:
+   mysql_root_password: mysqlroot123
+   wordpress_db: wordpress
+   wordpress_user: wpuser
+   wordpress_password: password123
+
+  tasks:
+
+#######################################################################
+# Installing full lampStack and php mysql bindings
+#######################################################################
+
+  - name: Installing Complete LampStack
+    yum: name={{ item }} state=present
+    with_items:
+    - httpd24
+    - php71
+    - mysql55-server
+    - php71-mysqlnd
+    - php71-mbstring
+    - MySQL-python27
+
+  - name: Restarting Lamp-Stack.
+    service: name={{ item }} state=restarted enabled=yes
+    with_items:
+    - mysqld
+    - httpd
+
+
+#######################################################################
+# Configuring Mysql And Creating Necessary User,Database for wordpress
+#######################################################################
+
+  - name: mysql-removing anon users.
+    mysql_user: login_user=root login_password='' name=''  host_all=yes state=absent
+
+  - name: Creating Wordpress Database.
+    mysql_db: db="{{wordpress_db}}" state=present
+
+  - name: Creating wordpress user.
+    mysql_user: name="{{wordpress_user}}" host=localhost password="{{wordpress_password}}"  priv="{{wordpress_db}}.*:ALL"
+
+  - name: Updating MySql-Root Password.
+    mysql_user: name=root host_all=yes password="{{mysql_root_password}}"
+
+#######################################################################
+# Configuring Mysql And Creating Necessary User,Database for wordpress
+#######################################################################
+
+
+  - name: Downloading Wodpress.
+    get_url: url=http://www.wordpress.org/latest.tar.gz  dest=/tmp/wordpress.tar
+
+  - name: Extracting wordpress contents.
+    unarchive: src=/tmp/wordpress.tar dest=/tmp/  remote_src=yes
+
+  - name: Copying wordpress contents.
+    shell: "cp -r /tmp/wordpress/*  /var/www/html/"
+
+
+  - name: Copying wp-config.php file.
+    copy: src=/var/www/html/wp-config-sample.php  dest=/var/www/html/wp-config.php remote_src=yes
+
+#######################################################################
+# Cleaning extracted directory and tar file
+#######################################################################
+
+  - name: Removing Wordpress.tar
+    file: path=/tmp/wordpress.tar state=absent
+
+  - name: Removing Wodpress Extracted Directory.
+    file: path=/tmp/wordpress state=absent
+
+#######################################################################
+# Wordpress Configuration
+#######################################################################
+
+  - name: Chaning Doc-root permission.
+    shell: 'chown -R apache:apache /var/www/html/'
+    args:
+     warn: false # set warn=false to prevent warning
+
+  - name: Update WordPress config file
+    lineinfile:
+      dest: "/var/www/html/wp-config.php"
+      regexp: "{{ item.regexp }}"
+      line: "{{ item.line }}"
+    with_items:
+     - {'regexp': "define\\('DB_NAME', '(.)+'\\);", 'line': "define('DB_NAME', '{{wordpress_db}}');"}
+     - {'regexp': "define\\('DB_USER', '(.)+'\\);", 'line': "define('DB_USER', '{{wordpress_user}}');"}
+     - {'regexp': "define\\('DB_PASSWORD', '(.)+'\\);", 'line': "define('DB_PASSWORD', '{{wordpress_password}}');"}
+
+
+#######################################################################
+# Final Service Restart
+#######################################################################
+
+  - name: Restarting LampStack.
+    service: name={{ item }} state=restarted
+    with_items:
+    - mysqld
+    - httpd
