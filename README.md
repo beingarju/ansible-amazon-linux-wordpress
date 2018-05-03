@@ -6,7 +6,7 @@ This ansible playbook will install full Lampstack and wordpress on aws ec2 runni
 #### - Download the git repo.
 
 ```
-[gnu]$ git clone git remote add origin git@github.com:beingarju/ansible-amazon-linux-wordpress.git
+[gnu]$ git clone git@github.com:beingarju/ansible-amazon-linux-wordpress.git
 ```
 
 ```
